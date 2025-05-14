@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<students>
+    <student code="SV001">
+        <full_name>Nguyen Van A</full_name>
+        <dob>2001-05-20</dob>
+        <gender>Male</gender>
+    </student>
+    <student code="SV002">
+        <full_name>Le Thi B</full_name>
+        <dob>2002-08-15</dob>
+        <gender>Female</gender>
+    </student>
+</students>
