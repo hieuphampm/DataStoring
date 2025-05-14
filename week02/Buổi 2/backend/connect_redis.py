@@ -6,14 +6,14 @@ r = redis.Redis(
     decode_responses=True,
 )
 
-try: 
-    r.set("student:SV001", "Nguyen Van A")
+# try: 
+#     r.set("student:SV001", "Nguyen Van A")
 
-    name = r.get("student:SV001")
-    print("Tên sinh viên từ Redis:", name)
+#     name = r.get("student:SV001")
+#     print("Tên sinh viên từ Redis:", name)
 
-except Exception as e:
-    print("Lỗi kết nối Redis:", e)
+# except Exception as e:
+#     print("Lỗi kết nối Redis:", e)
 
-finally:
-    r.close()
+# finally:
+#     r.close()
