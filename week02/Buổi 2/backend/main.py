@@ -4,6 +4,8 @@ from app.routes.chat import chat
 
 app = FastAPI()
 
+allow_origins=["*"] 
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
