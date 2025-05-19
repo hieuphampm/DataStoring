@@ -21,6 +21,17 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
