@@ -1,12 +1,8 @@
-import os
 import redis
 
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_port = int(os.getenv("REDIS_PORT", 6379))
-
 r = redis.Redis(
-    host=redis_host,
-    port=redis_port,
+    host='10.148.0.2',
+    port=6379,
     decode_responses=True,
-    socket_timeout=5
+    socket_timeout=5  
 )
