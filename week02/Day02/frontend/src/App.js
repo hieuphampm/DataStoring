@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import { BsSend, BsChat, BsPersonCircle } from 'react-icons/bs';
 
 function App() {
   const [messages, setMessages] = useState([]);
   const [user, setUser] = useState('User_' + Math.random().toString(36).substr(2, 5));
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef(null);
+  const messageContainerRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -62,48 +64,68 @@ function App() {
   };
 
   return (
-    <div className="app">
-      <div className="header">
-        <h1>Anonymous Chat</h1>
+    <div className="d-flex flex-column vh-100">
+      {/* Header */}
+      <div className="bg-primary text-white p-3">
+        <div className="d-flex align-items-center">
+          <BsChat className="me-2" size={24} />
+          <h1 className="h5 mb-0 fw-bold">Anonymous Chat</h1>
+        </div>
       </div>
-      <div className="message-container">
+
+      {/* Message Container */}
+      <div 
+        ref={messageContainerRef}
+        className="flex-grow-1 p-3 overflow-auto" 
+        style={{ backgroundColor: '#f8f9fa' }}
+      >
         {messages.map((msg, index) => (
           <div
             key={index}
-            className={`message-wrapper ${msg.user === user ? 'message-right' : 'message-left'}`}
+            className={`d-flex mb-3 ${msg.user === user ? 'justify-content-end' : 'justify-content-start'}`}
           >
-            <div className={`message ${msg.user === user ? 'message-own' : 'message-other'}`}>
-              <div className="message-content">{msg.message}</div>
-              <div className="message-timestamp">{formatTimestamp(msg.timestamp)}</div>
+            {msg.user !== user && (
+              <div className="me-2 align-self-end">
+                <BsPersonCircle size={24} className="text-secondary" />
+              </div>
+            )}
+            <div
+              className={`p-3 rounded-3 shadow-sm ${
+                msg.user === user ? 'bg-primary text-white' : 'bg-white'
+              }`}
+              style={{ maxWidth: '75%', wordBreak: 'break-word' }}
+            >
+              <div>{msg.message}</div>
+              <div className="text-end mt-1" style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                {formatTimestamp(msg.timestamp)}
+              </div>
             </div>
+            {msg.user === user && (
+              <div className="ms-2 align-self-end">
+                <BsPersonCircle size={24} className="text-primary" />
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
-      <div className="input-container">
-        <form onSubmit={sendMessage} className="input-form">
+
+      {/* Input Container */}
+      <div className="p-3 border-top bg-white">
+        <form onSubmit={sendMessage} className="d-flex">
           <input
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type a message..."
-            className="input-field"
+            className="form-control rounded-pill me-2"
           />
-          <button type="submit" className="send-button">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="send-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-              />
-            </svg>
+          <button 
+            type="submit" 
+            className="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" 
+            style={{ width: '42px', height: '42px', flexShrink: 0 }}
+          >
+            <BsSend />
           </button>
         </form>
       </div>

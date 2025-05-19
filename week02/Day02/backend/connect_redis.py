@@ -1,8 +1,8 @@
 import redis
 
 r = redis.Redis(
-    host='34.126.105.71',
+    host='10.148.0.2',
     port=6379,
     decode_responses=True,
-    socket_timeout=5  # Add timeout to handle connection issues
+    socket_timeout=5  
 )
