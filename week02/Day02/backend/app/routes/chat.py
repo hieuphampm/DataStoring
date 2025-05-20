@@ -15,7 +15,7 @@ class Message(BaseModel):
     user: str
     message: str
 
-@chat.post("/send")
+@chat.post("/messages")
 async def send_message(msg: Message):
     try:
         message_data = {
