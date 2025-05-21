@@ -6,6 +6,11 @@ services:
     container_name: redis
     networks:
       - chatnet
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build: ./backend
@@ -15,7 +20,13 @@ services:
     environment:
       - REDIS_HOST=redis
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/messages"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - chatnet
 
@@ -28,7 +39,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - chatnet
 

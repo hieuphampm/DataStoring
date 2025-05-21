@@ -14,15 +14,22 @@ function App() {
   };
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch('http://backend:8000/messages');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        setMessages(data.messages || []);
-        scrollToBottom();
-      } catch (error) {
-        console.error('Fetch error:', error.message);
+    const fetchMessages = async (retries = 3, delay = 2000) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch('http://backend:8000/messages');
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          const data = await response.json();
+          setMessages(data.messages || []);
+          scrollToBottom();
+          return; // Success, exit retry loop
+        } catch (error) {
+          console.error('Fetch error:', error.message);
+          if (i < retries - 1) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+            console.log(`Retrying fetch... (${i + 1}/${retries})`);
+          }
+        }
       }
     };
 
