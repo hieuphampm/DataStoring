@@ -17,7 +17,7 @@ function App() {
     const fetchMessages = async (retries = 3, delay = 2000) => {
       for (let i = 0; i < retries; i++) {
         try {
-          const response = await fetch('http://backend:8000/messages');
+          const response = await fetch('http://34.2.19.12:8000/messages');
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const data = await response.json();
           setMessages(data.messages || []);
@@ -43,7 +43,7 @@ function App() {
     if (!message.trim()) return;
 
     try {
-      const response = await fetch('http://backend:8000/messages', {
+      const response = await fetch('http://34.2.19.12:8000/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user, message }),
