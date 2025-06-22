@@ -1,13 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from connect_redis import r
 import json
 from datetime import datetime
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 chat = APIRouter()
 
@@ -16,30 +11,27 @@ class Message(BaseModel):
     message: str
 
 @chat.post("/messages")
-async def send_message(msg: Message):
+async def send_message(msg: Message, room: str = Query(...)):
+    key = f"chat:room:{room}"
     try:
         message_data = {
             "user": msg.user,
             "message": msg.message,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        logger.info(f"Sending message: {message_data}")
-        r.rpush("chat:messages", json.dumps(message_data))
-        r.expire("chat:messages", 3600)  # Set TTL to 1 hour
-        if r.llen("chat:messages") > 100:
-            r.ltrim("chat:messages", -100, -1)
-        logger.info("Message stored successfully")
+        r.rpush(key, json.dumps(message_data))
+        r.expire(key, 3600)  # Set TTL to 1 hour
+        if r.llen(key) > 100:
+            r.ltrim(key, -100, -1)
         return {"status": "success", "message": "Message stored"}
     except Exception as e:
-        logger.error(f"Error in send_message: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @chat.get("/messages")
-async def get_messages():
+async def get_messages(room: str = Query(...)):
+    key = f"chat:room:{room}"
     try:
-        messages = r.lrange("chat:messages", 0, -1)
-        logger.info(f"Fetched {len(messages)} messages")
+        messages = r.lrange(key, 0, -1)
         return {"messages": [json.loads(msg) for msg in messages]}
     except Exception as e:
-        logger.error(f"Error in get_messages: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
