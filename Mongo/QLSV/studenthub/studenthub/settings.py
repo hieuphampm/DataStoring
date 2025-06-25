@@ -121,3 +121,6 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# thêm cấu hình kết nối MongoDB
+MONGO_URL = "mongodb://localhost:27017"
+MONGO_DB_NAME = "university"
