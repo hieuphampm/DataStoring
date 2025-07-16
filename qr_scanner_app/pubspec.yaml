@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.8.1
+  sdk: ^3.7.2
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -35,6 +35,10 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   mobile_scanner: ^7.0.1
+  http: ^1.1.0 # Để gọi API
+  cached_network_image: ^3.2.3 # Hiển thị và cache ảnh từ URL, hiệu năng tốt
+  video_player: ^2.6.1 # Để chạy video từ URL
+  url_launcher: ^6.1.11 # Để mở link (nếu cần)
 
 dev_dependencies:
   flutter_test:

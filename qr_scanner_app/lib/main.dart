@@ -1,18 +1,97 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async'; // Thêm thư viện để sử dụng Timeout
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:video_player/video_player.dart';
+
+// IMPORTANT: Thay đổi địa chỉ IP của bạn ở đây.
+// 1. Mở Command Prompt (Windows) hoặc Terminal (macOS).
+// 2. Gõ `ipconfig` (Windows) hoặc `ifconfig` (macOS).
+// 3. Tìm địa chỉ IPv4 của bạn (ví dụ: 192.168.1.10).
+// Đây là địa chỉ của máy tính đang chạy server backend.
+const String YOUR_LOCAL_IP = '192.168.9.203'; 
+const String API_BASE_URL = 'http://$YOUR_LOCAL_IP:5001/api/products';
 
 void main() {
   runApp(QRScannerApp());
 }
 
+// --- Model cho sản phẩm ---
+class Product {
+  final String id;
+  final String name;
+  final String origin;
+  final String description;
+  final double price;
+  final String imageUrl;
+  final String? videoUrl;
+  final String qrCodeUrl;
+  final String status;
+
+  Product({
+    required this.id,
+    required this.name,
+    required this.origin,
+    required this.description,
+    required this.price,
+    required this.imageUrl,
+    this.videoUrl,
+    required this.qrCodeUrl,
+    required this.status,
+  });
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['_id'],
+      name: json['name'] ?? 'N/A',
+      origin: json['origin'] ?? 'N/A',
+      description: json['description'] ?? 'N/A',
+      price: (json['price'] as num? ?? 0).toDouble(),
+      imageUrl: json['imageUrl'] ?? '',
+      videoUrl: json['videoUrl'],
+      qrCodeUrl: json['qrCodeUrl'] ?? '',
+      status: json['status'] ?? 'N/A',
+    );
+  }
+}
+
+// --- Service để gọi API ---
+class ApiService {
+  static Future<Product> fetchProductById(String id) async {
+    try {
+      final response = await http.get(Uri.parse('$API_BASE_URL/$id')).timeout(
+        const Duration(seconds: 10), // Thêm timeout 10 giây
+        onTimeout: () {
+          // Trả về một TimeoutException nếu request quá lâu
+          throw TimeoutException('Không thể kết nối đến server, vui lòng thử lại.');
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return Product.fromJson(jsonDecode(utf8.decode(response.bodyBytes)));
+      } else if (response.statusCode == 404) {
+        throw Exception('Không tìm thấy sản phẩm với ID này.');
+      } else {
+        throw Exception('Server trả về lỗi. Mã lỗi: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Ném lại lỗi để lớp UI có thể bắt và hiển thị
+      rethrow;
+    }
+  }
+}
+
+// --- Giao diện chính của App, đã khôi phục theme gốc ---
 class QRScannerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'QR Scanner',
+      title: 'QR Scanner', // Giữ lại title gốc
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.blue, // Khôi phục theme màu xanh dương gốc
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: MainScreen(),
@@ -21,6 +100,7 @@ class QRScannerApp extends StatelessWidget {
   }
 }
 
+// --- Màn hình chính, khôi phục 100% giao diện gốc ---
 class MainScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -36,7 +116,6 @@ class MainScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // QR Code Icon
             Container(
               padding: EdgeInsets.all(30),
               decoration: BoxDecoration(
@@ -49,10 +128,7 @@ class MainScreen extends StatelessWidget {
                 color: Colors.blue[600],
               ),
             ),
-
             SizedBox(height: 40),
-
-            // Title
             Text(
               'QR Code Scanner',
               style: TextStyle(
@@ -61,10 +137,7 @@ class MainScreen extends StatelessWidget {
                 color: Colors.grey[800],
               ),
             ),
-
             SizedBox(height: 16),
-
-            // Description
             Text(
               'Tap the camera button to scan QR codes',
               style: TextStyle(
@@ -73,10 +146,7 @@ class MainScreen extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-
             SizedBox(height: 60),
-
-            // Camera Button
             ElevatedButton(
               onPressed: () {
                 Navigator.push(
@@ -112,21 +182,51 @@ class MainScreen extends StatelessWidget {
   }
 }
 
+// --- Màn hình quét, kết hợp logic mới và giao diện cũ ---
 class ScannerScreen extends StatefulWidget {
   @override
   _ScannerScreenState createState() => _ScannerScreenState();
 }
 
 class _ScannerScreenState extends State<ScannerScreen> {
-  late MobileScannerController controller;
-  bool isScanning = true;
-  String? scannedData;
+  final MobileScannerController controller = MobileScannerController();
+  bool isProcessing = false;
   bool flashOn = false;
 
-  @override
-  void initState() {
-    super.initState();
-    controller = MobileScannerController();
+  Future<void> _handleScannedCode(String productId) async {
+    // **DEBUGGING:** In ra ID đã quét được
+    print('--- Đang xử lý mã QR với ID: $productId ---');
+
+    try {
+      final product = await ApiService.fetchProductById(productId);
+      if (mounted) {
+        print('--- Lấy dữ liệu thành công, đang chuyển màn hình ---');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => ProductDetailScreen(product: product)),
+        );
+      }
+    } catch (e, stackTrace) {
+      // **DEBUGGING:** In ra lỗi chi tiết trong Debug Console
+      print('!!! ĐÃ XẢY RA LỖI !!!');
+      print('Lỗi: $e');
+      print('Stacktrace: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        // Reset lại trạng thái để cho phép quét lại
+        setState(() {
+          isProcessing = false;
+          controller.start();
+        });
+      }
+    }
   }
 
   @override
@@ -141,7 +241,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // Flash toggle
           IconButton(
             icon: Icon(
               flashOn ? Icons.flash_on : Icons.flash_off,
@@ -154,7 +253,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
               });
             },
           ),
-          // Camera flip
           IconButton(
             icon: Icon(Icons.flip_camera_ios),
             onPressed: () => controller.switchCamera(),
@@ -163,148 +261,35 @@ class _ScannerScreenState extends State<ScannerScreen> {
       ),
       body: Stack(
         children: [
-          // Camera view
           MobileScanner(
             controller: controller,
-            onDetect: (BarcodeCapture capture) {
-              if (isScanning) {
-                final List<Barcode> barcodes = capture.barcodes;
-                if (barcodes.isNotEmpty) {
-                  final barcode = barcodes.first;
-                  if (barcode.rawValue != null) {
-                    setState(() {
-                      isScanning = false;
-                      scannedData = barcode.rawValue!;
-                    });
+            onDetect: (capture) {
+              if (isProcessing) return;
 
-                    // Navigate to result screen after a brief delay
-                    Future.delayed(Duration(milliseconds: 500), () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ResultScreen(
-                            scannedData: scannedData!,
-                          ),
-                        ),
-                      );
-                    });
-                  }
+              final List<Barcode> barcodes = capture.barcodes;
+              if (barcodes.isNotEmpty) {
+                final String? code = barcodes.first.rawValue;
+                if (code != null && code.isNotEmpty) {
+                  setState(() { isProcessing = true; });
+                  controller.stop();
+                  _handleScannedCode(code);
                 }
               }
             },
           ),
-
-          // Scanning overlay
           Center(
             child: Container(
               width: 250,
               height: 250,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isScanning ? Colors.green : Colors.orange,
+                  color: isProcessing ? Colors.orange : Colors.green,
                   width: 3,
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-
-          // Corner indicators
-          Center(
-            child: Container(
-              width: 250,
-              height: 250,
-              child: Stack(
-                children: [
-                  // Top-left corner
-                  Positioned(
-                    top: -3,
-                    left: -3,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(color: Colors.green, width: 6),
-                          left: BorderSide(color: Colors.green, width: 6),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Top-right corner
-                  Positioned(
-                    top: -3,
-                    right: -3,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(color: Colors.green, width: 6),
-                          right: BorderSide(color: Colors.green, width: 6),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Bottom-left corner
-                  Positioned(
-                    bottom: -3,
-                    left: -3,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Colors.green, width: 6),
-                          left: BorderSide(color: Colors.green, width: 6),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Bottom-right corner
-                  Positioned(
-                    bottom: -3,
-                    right: -3,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Colors.green, width: 6),
-                          right: BorderSide(color: Colors.green, width: 6),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Scanning line animation
-          if (isScanning)
-            Center(
-              child: Container(
-                width: 250,
-                height: 250,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0.0, end: 1.0),
-                  duration: Duration(seconds: 2),
-                  builder: (context, value, child) {
-                    return CustomPaint(
-                      painter: ScannerLinePainter(value),
-                    );
-                  },
-                  onEnd: () {
-                    if (mounted && isScanning) {
-                      setState(() {});
-                    }
-                  },
-                ),
-              ),
-            ),
-
-          // Bottom instruction panel
           Positioned(
             bottom: 0,
             left: 0,
@@ -319,40 +304,29 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 ),
               ),
               child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (isScanning) ...[
-                      Icon(
-                        Icons.qr_code_scanner,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Position QR code within the frame',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
+                child: isProcessing
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
+                        SizedBox(height: 16),
+                        Text(
+                          'Đang xử lý dữ liệu...',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ] else ...[
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'QR Code Detected!',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      ],
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.qr_code_scanner, color: Colors.white, size: 32),
+                        SizedBox(height: 8),
+                        Text(
+                          'Position QR code within the frame',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
+                      ],
+                    ),
               ),
             ),
           ),
@@ -360,7 +334,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       ),
     );
   }
-
+  
   @override
   void dispose() {
     controller.dispose();
@@ -368,58 +342,30 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 }
 
-class ScannerLinePainter extends CustomPainter {
-  final double animationValue;
+// --- Màn hình chi tiết sản phẩm, được thiết kế lại dựa trên giao diện ResultScreen cũ ---
+class ProductDetailScreen extends StatefulWidget {
+  final Product product;
 
-  ScannerLinePainter(this.animationValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.green
-      ..strokeWidth = 2;
-
-    final y = size.height * animationValue;
-    canvas.drawLine(
-      Offset(0, y),
-      Offset(size.width, y),
-      paint,
-    );
-  }
+  const ProductDetailScreen({Key? key, required this.product}) : super(key: key);
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+  _ProductDetailScreenState createState() => _ProductDetailScreenState();
 }
 
-class ResultScreen extends StatelessWidget {
-  final String scannedData;
+class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  VideoPlayerController? _videoController;
 
-  const ResultScreen({Key? key, required this.scannedData}) : super(key: key);
-
-  bool _isUrl(String text) {
-    return text.startsWith('http://') || text.startsWith('https://');
-  }
-
-  bool _isEmail(String text) {
-    return text.contains('@') && text.contains('.');
-  }
-
-  bool _isPhone(String text) {
-    return RegExp(r'^[\+]?[0-9\-\(\)\s]+$').hasMatch(text);
-  }
-
-  String _getDataType() {
-    if (_isUrl(scannedData)) return 'Website URL';
-    if (_isEmail(scannedData)) return 'Email Address';
-    if (_isPhone(scannedData)) return 'Phone Number';
-    return 'Text';
-  }
-
-  IconData _getDataIcon() {
-    if (_isUrl(scannedData)) return Icons.link;
-    if (_isEmail(scannedData)) return Icons.email;
-    if (_isPhone(scannedData)) return Icons.phone;
-    return Icons.text_fields;
+  @override
+  void initState() {
+    super.initState();
+    if (widget.product.videoUrl != null && widget.product.videoUrl!.isNotEmpty) {
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(widget.product.videoUrl!))
+        ..initialize().then((_) {
+          if (mounted) {
+            setState(() {});
+          }
+        });
+    }
   }
 
   @override
@@ -437,75 +383,33 @@ class ResultScreen extends StatelessWidget {
           },
         ),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(20),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Success Icon
-            Container(
-              alignment: Alignment.center,
-              padding: EdgeInsets.all(20),
-              child: Container(
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  size: 60,
-                  color: Colors.green[600],
+            // Ảnh sản phẩm
+            if (widget.product.imageUrl.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12.0),
+                child: CachedNetworkImage(
+                  imageUrl: widget.product.imageUrl,
+                  placeholder: (context, url) => Container(
+                    height: 250,
+                    color: Colors.grey[200],
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    height: 250,
+                    color: Colors.grey[200],
+                    child: Icon(Icons.broken_image, size: 50, color: Colors.grey[400]),
+                  ),
+                  fit: BoxFit.cover,
                 ),
               ),
-            ),
-
             SizedBox(height: 20),
 
-            // Success Message
-            Text(
-              'QR Code Scanned Successfully!',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            SizedBox(height: 30),
-
-            // Data Type Indicator
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _getDataIcon(),
-                    size: 16,
-                    color: Colors.blue[600],
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    _getDataType(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 16),
-
-            // Result Container
+            // Container chứa thông tin, style giống ResultScreen cũ
             Container(
               padding: EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -524,51 +428,70 @@ class ResultScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Scanned Data:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
+                    widget.product.name,
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                   ),
                   SizedBox(height: 12),
-                  SelectableText(
-                    scannedData,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.blue[600],
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${widget.product.price.toStringAsFixed(0)} VNĐ',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: widget.product.status == 'còn hàng' ? Colors.green[100] : Colors.red[100],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          widget.product.status.toUpperCase(),
+                          style: TextStyle(
+                            color: widget.product.status == 'còn hàng' ? Colors.green[800] : Colors.red[800],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Divider(height: 24),
+                  _buildInfoRow(Icons.flag_outlined, 'Xuất xứ', widget.product.origin),
+                  SizedBox(height: 16),
+                  Text('Mô tả chi tiết:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text(
+                    widget.product.description,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[700], height: 1.5),
                   ),
                 ],
               ),
             ),
+            SizedBox(height: 20),
 
-            SizedBox(height: 30),
+            // Video Player
+            if (_videoController != null && _videoController!.value.isInitialized)
+              _buildVideoPlayer(),
+            SizedBox(height: 20),
 
-            // Action Buttons
+            // Các nút bấm hành động giống ResultScreen cũ
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: scannedData));
+                      Clipboard.setData(ClipboardData(text: widget.product.id));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Copied to clipboard!'),
-                          backgroundColor: Colors.green,
-                          duration: Duration(seconds: 2),
-                        ),
+                        SnackBar(content: Text('Đã sao chép ID sản phẩm!')),
                       );
                     },
                     icon: Icon(Icons.copy),
-                    label: Text('Copy'),
+                    label: Text('Copy ID'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue[600],
                       foregroundColor: Colors.white,
                       padding: EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -584,47 +507,70 @@ class ResultScreen extends StatelessWidget {
                       backgroundColor: Colors.green[600],
                       foregroundColor: Colors.white,
                       padding: EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
               ],
             ),
-
-            SizedBox(height: 20),
-
-            // Additional info
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.blue[600],
-                    size: 20,
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Tip: You can copy the result and use it in other apps',
-                      style: TextStyle(
-                        color: Colors.blue[800],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.grey[600], size: 20),
+        SizedBox(width: 12),
+        Text('$label: ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        Expanded(
+          child: Text(value, style: TextStyle(fontSize: 16, color: Colors.grey[800])),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVideoPlayer() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Video minh họa',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 12),
+        AspectRatio(
+          aspectRatio: _videoController!.value.aspectRatio,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              VideoPlayer(_videoController!),
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _videoController!.value.isPlaying
+                        ? _videoController!.pause()
+                        : _videoController!.play();
+                  });
+                },
+                icon: Icon(
+                  _videoController!.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                  color: Colors.white.withOpacity(0.8),
+                  size: 60,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
   }
 }
