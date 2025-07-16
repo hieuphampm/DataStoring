@@ -1,3 +1,0 @@
-Mongo/DB/*.lock
-Mongo/DB/WiredTiger
-Mongo/DB/WiredTiger.*
