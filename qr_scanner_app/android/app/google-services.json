@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "716820880581",
+    "firebase_url": "https://computer-shop-management-a2cdd-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "computer-shop-management-a2cdd",
+    "storage_bucket": "computer-shop-management-a2cdd.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:716820880581:android:25f6a873ee21249e4264ac",
+        "android_client_info": {
+          "package_name": "com.example.qr_scanner_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "716820880581-33g9kkkberrkuq5m1f3h8929ueuna8pn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkNh6Q31PZKTIXN7GR_FsGId0yQZqfRhg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "716820880581-33g9kkkberrkuq5m1f3h8929ueuna8pn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
